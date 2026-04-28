@@ -1,11 +1,13 @@
 package com.fake.firebasebasics
 
+import android.R.attr.delay
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.*
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.material.icons.Icons
@@ -15,13 +17,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.fake.firebasebasics.ui.theme.FirebaseBasicsTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.time.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,6 +55,8 @@ class MainActivity : ComponentActivity() {
 fun SwapShopScreen(vm: SwapViewModel, onLogout: () -> Unit) {
     var showSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -60,6 +69,10 @@ fun SwapShopScreen(vm: SwapViewModel, onLogout: () -> Unit) {
                 }
             )
         },
+        // FIX 1: Move SnackbarHost here. Scaffold handles alignment automatically.
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { showSheet = true }) {
                 Icon(Icons.Default.Add, null)
@@ -68,11 +81,28 @@ fun SwapShopScreen(vm: SwapViewModel, onLogout: () -> Unit) {
     ) { p ->
         Box(modifier = Modifier.padding(p)) {
             if (vm.itemList.isEmpty()) {
-                Box(Modifier.fillMaxSize(), Alignment.Center) { Text("No items found") }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No items found")
+                }
             } else {
-                LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     items(vm.itemList) { item ->
-                        Card(Modifier.fillMaxWidth()) {
+                        Card(Modifier.fillMaxWidth().clickable {
+                            scope.launch {
+                                val result = snackbarHostState.showSnackbar(
+                                    message = "Hello there",
+                                    actionLabel = "OK",
+                                    duration = SnackbarDuration.Short
+                                )
+
+                                if (result == SnackbarResult.ActionPerformed) {
+                                    println("Snackbar action clicked")
+                                }
+                            }
+                        }) {
                             Column {
                                 AsyncImage(item.imageUrl, null, Modifier.fillMaxWidth().height(180.dp), contentScale = ContentScale.Crop)
                                 Text(item.title, Modifier.padding(8.dp), fontWeight = FontWeight.Bold)
@@ -103,12 +133,22 @@ fun AddItemSheetContent(onUpload: (String, String, Uri) -> Unit) {
     var uri by remember { mutableStateOf<Uri?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri = it }
 
-    Column(Modifier.padding(16.dp).fillMaxWidth(),
-        Alignment.CenterHorizontally as Arrangement.Vertical
+    // FIX 2: Corrected the Alignment/Arrangement confusion
+    Column(
+        Modifier.padding(16.dp).fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         OutlinedTextField(t, { t = it }, label = { Text("Title") })
         OutlinedTextField(p, { p = it }, label = { Text("Price") })
-        Button(onClick = { picker.launch("image/*") }) { Text(if (uri == null) "Select Image" else "Image Selected") }
-        Button(onClick = { onUpload(t, p, uri!!) }, enabled = t.isNotBlank() && p.isNotBlank() && uri != null) { Text("Post") }
+        Button(onClick = { picker.launch("image/*") }) {
+            Text(if (uri == null) "Select Image" else "Image Selected")
+        }
+        Button(
+            onClick = { onUpload(t, p, uri!!) },
+            enabled = t.isNotBlank() && p.isNotBlank() && uri != null
+        ) {
+            Text("Post")
+        }
     }
 }

@@ -1,7 +1,5 @@
 package com.fake.firebasebasics
 
-import com.fake.firebasebasics.BuildConfig
-//import io.github.jan.supabase.BuildConfig
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.storage.Storage
 
